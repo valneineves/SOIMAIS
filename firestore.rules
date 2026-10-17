@@ -1,0 +1,311 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Identificação de Administrador: prioriza coleção protegida /admins com bootstrap controlado
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'nevesvalnei@gmail.com'
+      );
+    }
+
+    // Valida se o usuário autenticado está aprovado e ativo no sistema
+    function isActiveUser() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'ativo'
+        )
+      );
+    }
+
+    // Papel operacional do usuário autenticado obtido do banco de dados
+    function getUserRole() {
+      return isAdmin()
+        ? 'gestao'
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Entity Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'nome', 'email', 'role', 'status']) &&
+        data.uid is string && data.uid.size() <= 128 &&
+        data.nome is string && data.nome.size() <= 100 &&
+        data.email is string && data.email.size() <= 120 &&
+        data.role in ['gestao', 'administracao', 'responsavel_obra', 'encarregado_mestre', 'campo'] &&
+        data.status in ['ativo', 'inativo', 'pendente'];
+    }
+
+    function isValidObra(data) {
+      return data.keys().hasAll(['id', 'codigo', 'nome', 'status', 'responsavelUid']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.codigo is string && data.codigo.size() <= 30 &&
+        data.nome is string && data.nome.size() <= 120 &&
+        data.status in ['planejamento', 'preparacao', 'em_execucao', 'em_conclusao', 'concluida', 'suspensa'] &&
+        data.responsavelUid is string && data.responsavelUid.size() <= 128;
+    }
+
+    function isValidEtapa(data) {
+      return data.keys().hasAll(['id', 'obraId', 'ordem', 'nome', 'status']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.obraId is string && data.obraId.size() <= 128 &&
+        data.ordem is number &&
+        data.nome is string && data.nome.size() <= 100 &&
+        data.status in ['planejada', 'pronta', 'em_andamento', 'concluida', 'bloqueada'];
+    }
+
+    function isValidAtividade(data) {
+      return data.keys().hasAll(['id', 'obraId', 'etapaId', 'nome', 'status', 'prontidaoAtendida']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.obraId is string && data.obraId.size() <= 128 &&
+        data.etapaId is string && data.etapaId.size() <= 128 &&
+        data.nome is string && data.nome.size() <= 150 &&
+        data.status in ['planejada', 'preparando', 'liberada', 'em_execucao', 'pausada', 'concluida', 'bloqueada'] &&
+        data.prontidaoAtendida is bool;
+    }
+
+    function isValidExecucao(data) {
+      return data.keys().hasAll(['id', 'obraId', 'atividadeId', 'tipo', 'registradoPorUid']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.obraId is string && data.obraId.size() <= 128 &&
+        data.atividadeId is string && data.atividadeId.size() <= 128 &&
+        data.tipo in ['inicio', 'avanco', 'pausa', 'retomada', 'finalizacao'] &&
+        data.registradoPorUid is string && data.registradoPorUid.size() <= 128;
+    }
+
+    function isValidOcorrencia(data) {
+      return data.keys().hasAll(['id', 'obraId', 'codigo', 'titulo', 'gravidade', 'status', 'registradoPorUid']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.obraId is string && data.obraId.size() <= 128 &&
+        data.codigo is string && data.codigo.size() <= 30 &&
+        data.titulo is string && data.titulo.size() <= 150 &&
+        data.gravidade in ['baixa', 'media', 'alta', 'critica'] &&
+        data.status in ['aberta', 'em_analise', 'acao_em_andamento', 'resolvida', 'encerrada'] &&
+        data.registradoPorUid is string && data.registradoPorUid.size() <= 128;
+    }
+
+    function isValidPendencia(data) {
+      return data.keys().hasAll(['id', 'obraId', 'titulo', 'categoria', 'obrigatoria', 'status']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.obraId is string && data.obraId.size() <= 128 &&
+        data.titulo is string && data.titulo.size() <= 150 &&
+        data.categoria in ['documental', 'tecnica', 'insumo', 'fiscalizacao', 'vistoria'] &&
+        data.obrigatoria is bool &&
+        data.status in ['aberta', 'em_tratamento', 'concluida'];
+    }
+
+    function isValidRecurso(data) {
+      return data.keys().hasAll(['id', 'obraId', 'nome', 'tipo', 'disponibilidade']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.obraId is string && data.obraId.size() <= 128 &&
+        data.nome is string && data.nome.size() <= 100 &&
+        data.tipo in ['equipamento', 'equipe', 'material_critico'] &&
+        data.disponibilidade in ['disponivel', 'em_uso', 'manutencao', 'indisponivel'];
+    }
+
+    function isValidAuditoria(data) {
+      return data.keys().hasAll(['id', 'entidade', 'entidadeId', 'acao', 'usuarioUid']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.entidade in ['obra', 'etapa', 'atividade', 'execucao', 'ocorrencia', 'pendencia', 'prontidao', 'usuario'] &&
+        data.entidadeId is string && data.entidadeId.size() <= 128 &&
+        data.acao is string && data.acao.size() >= 3 && data.acao.size() <= 100 &&
+        data.usuarioUid is string && data.usuarioUid.size() <= 128;
+    }
+
+    // ==========================================
+    // REGRAS POR COLEÇÃO
+    // ==========================================
+
+    match /users/{userId} {
+      // Usuário autenticado lê o próprio documento; usuários ativos com permissão de Gestão/Adm leem a equipe
+      allow get: if isSignedIn() && (request.auth.uid == userId || (isActiveUser() && getUserRole() in ['gestao', 'administracao']));
+      allow list: if isActiveUser() && (getUserRole() in ['gestao', 'administracao']);
+
+      // 7.1 Cadastro: novas contas entram OBRIGATORIAMENTE com status 'pendente' (salvo o bootstrap de admin inicial)
+      allow create: if isSignedIn() && (
+        isAdmin() ||
+        (
+          request.auth.uid == userId &&
+          incoming().uid == userId &&
+          incoming().email == request.auth.token.email &&
+          incoming().status == 'pendente' && // NUNCA entra ativo automaticamente!
+          isValidUser(incoming())
+        )
+      );
+
+      // 7.1 Ativação e Alteração:
+      // Apenas Gestão, Administração ou Admin podem aprovar (status: 'ativo') ou alterar o role de outro usuário
+      // O próprio usuário comum NUNCA pode alterar seu role nem seu status
+      allow update: if isSignedIn() && (
+        (
+          (isAdmin() || (isActiveUser() && getUserRole() in ['gestao', 'administracao'])) &&
+          isValidUser(incoming())
+        ) ||
+        (
+          request.auth.uid == userId &&
+          incoming().uid == existing().uid &&
+          incoming().email == existing().email &&
+          incoming().role == existing().role &&     // BLOQUEIO MATEMÁTICO DE AUTO-PROMOÇÃO
+          incoming().status == existing().status && // BLOQUEIO MATEMÁTICO DE AUTO-ATIVAÇÃO
+          isValidUser(incoming())
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isActiveUser();
+      // Bootstrap controlado: permite criação pelo admin inicial ou administradores registrados
+      allow create: if isSignedIn() && (request.auth.token.email == 'nevesvalnei@gmail.com' || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // 7.2 & 7.3: Controle de leitura e gravação por Obra
+    match /obras/{obraId} {
+      // Leitura protegida diretamente nas regras do Firestore:
+      // Gestão e Administração veem todas as obras.
+      // Responsável, Mestre e Campo veem APENAS as obras onde seu UID é o responsavelUid ou está na lista membrosUids
+      allow get, list: if isActiveUser() && (
+        getUserRole() in ['gestao', 'administracao'] ||
+        request.auth.uid == resource.data.responsavelUid ||
+        (resource.data.keys().hasAny(['membrosUids']) && resource.data.membrosUids is list && request.auth.uid in resource.data.membrosUids)
+      );
+      
+      // Criação de obra: Matriz oficial define que apenas Gestão ou Administração podem criar
+      allow create: if isActiveUser() && (
+        isAdmin() || getUserRole() in ['gestao', 'administracao']
+      ) && isValidObra(incoming());
+
+      // Atualização de obra protegida:
+      // 1. Gestão/Administração podem alterar campos cadastrais.
+      // 2. Conclusão de obra (status == 'concluida') exige GESTÃO (ou admin). Administração NÃO conclui obra.
+      // 3. Responsável de Obra edita somente sua própria obra e NÃO pode alterar responsavelUid, codigo ou status de conclusão.
+      allow update: if isActiveUser() && isValidObra(incoming()) && (
+        (
+          (isAdmin() || getUserRole() == 'gestao') &&
+          incoming().id == existing().id &&
+          incoming().codigo == existing().codigo
+        ) ||
+        (
+          getUserRole() == 'administracao' &&
+          incoming().id == existing().id &&
+          incoming().codigo == existing().codigo &&
+          incoming().status != 'concluida' // ADMINISTRAÇÃO NÃO CONCLUI OBRA
+        ) ||
+        (
+          getUserRole() == 'responsavel_obra' &&
+          existing().responsavelUid == request.auth.uid &&
+          incoming().responsavelUid == existing().responsavelUid && // RESPONSÁVEL NÃO MUDA ATRIBUIÇÃO
+          incoming().id == existing().id &&
+          incoming().codigo == existing().codigo &&
+          incoming().status != 'concluida' // RESPONSÁVEL NÃO CONCLUI DIRETAMENTE SEM GESTÃO
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /etapas/{etapaId} {
+      allow get, list: if isActiveUser();
+      allow create, update: if isActiveUser() && (isAdmin() || getUserRole() in ['gestao', 'administracao', 'responsavel_obra']) && isValidEtapa(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /atividades/{atividadeId} {
+      allow get, list: if isActiveUser();
+      allow create: if isActiveUser() && (isAdmin() || getUserRole() in ['gestao', 'administracao', 'responsavel_obra', 'encarregado_mestre']) && isValidAtividade(incoming());
+      
+      // 7.4 Proteção de status e conflitos:
+      // Campo NÃO pode liberar atividade
+      // Usuário de Campo não pode sobrescrever status crítico
+      allow update: if isActiveUser() && isValidAtividade(incoming()) && (
+        incoming().obraId == existing().obraId &&
+        (
+          incoming().status != 'liberada' ||
+          getUserRole() in ['gestao', 'administracao', 'responsavel_obra', 'encarregado_mestre'] ||
+          isAdmin()
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /execucoes/{execucaoId} {
+      allow get, list: if isActiveUser();
+      allow create: if isActiveUser() && isValidExecucao(incoming()) && incoming().registradoPorUid == request.auth.uid;
+      // Autoria imutável: o apontador original não pode ser adulterado
+      allow update: if isActiveUser() && isValidExecucao(incoming()) && incoming().registradoPorUid == existing().registradoPorUid;
+      allow delete: if isAdmin();
+    }
+
+    match /ocorrencias/{ocorrenciaId} {
+      allow get, list: if isActiveUser();
+      allow create: if isActiveUser() && isValidOcorrencia(incoming()) && incoming().registradoPorUid == request.auth.uid;
+      
+      // 7.3 & 7.7 Encerramento de ocorrências:
+      // Campo NÃO pode encerrar ocorrência.
+      // Encerramento exige autoridade técnica (Gestão, Administração ou Responsável de Obra) com resolução formal
+      allow update: if isActiveUser() && isValidOcorrencia(incoming()) &&
+        incoming().obraId == existing().obraId &&
+        incoming().registradoPorUid == existing().registradoPorUid &&
+        (
+          incoming().status != 'encerrada' ||
+          (
+            (isAdmin() || getUserRole() in ['gestao', 'administracao', 'responsavel_obra']) &&
+            incoming().resolucao is string &&
+            incoming().resolucao.size() >= 10 &&
+            incoming().autorizadoPor is string &&
+            incoming().autorizadoPor.size() > 0
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /pendencias/{pendenciaId} {
+      allow get, list: if isActiveUser();
+      allow create: if isActiveUser() && isValidPendencia(incoming());
+      allow update: if isActiveUser() && isValidPendencia(incoming()) && incoming().obraId == existing().obraId;
+      allow delete: if isAdmin();
+    }
+
+    match /recursos/{recursoId} {
+      allow get, list: if isActiveUser();
+      allow create, update: if isActiveUser() && (isAdmin() || getUserRole() in ['gestao', 'administracao', 'responsavel_obra']) && isValidRecurso(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // 7.5 Auditoria Imutável:
+    // Nenhuma atualização ou exclusão permitida. Evento assinado pelo request.auth.uid com entidade válida.
+    match /auditoria/{auditoriaId} {
+      allow get, list: if isActiveUser();
+      allow create: if isSignedIn() && isValidAuditoria(incoming()) && incoming().usuarioUid == request.auth.uid;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

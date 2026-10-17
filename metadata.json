@@ -1,0 +1,8 @@
+{
+  "name": "SOI+ - Sistema Operacional Inteligente para Construtoras",
+  "description": "Sistema Operacional Inteligente para Pequenas e Médias Construtoras: gestão de obras, prontidão, execução em campo e controle operacional.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

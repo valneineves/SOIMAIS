@@ -1,0 +1,245 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Perfil de usuário da construtora no SOI+",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["gestao", "administracao", "responsavel_obra", "encarregado_mestre", "campo"] },
+        "cargo": { "type": "string", "maxLength": 80 },
+        "telefone": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["ativo", "inativo", "pendente"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "nome", "email", "role", "status"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Administradores autorizados do sistema SOI+",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 120 },
+        "addedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Obra": {
+      "title": "Obra",
+      "description": "Empreendimento ou obra civil gerenciada pela construtora",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "codigo": { "type": "string", "maxLength": 30 },
+        "nome": { "type": "string", "maxLength": 120 },
+        "endereco": { "type": "string", "maxLength": 200 },
+        "cidade": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["planejamento", "preparacao", "em_execucao", "em_conclusao", "concluida", "suspensa"] },
+        "dataInicio": { "type": "string", "maxLength": 20 },
+        "dataPrevisaoFim": { "type": "string", "maxLength": 20 },
+        "responsavelUid": { "type": "string", "maxLength": 128 },
+        "responsavelNome": { "type": "string", "maxLength": 100 },
+        "membrosUids": { "type": "array" },
+        "descricao": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "codigo", "nome", "status", "responsavelUid"]
+    },
+    "Etapa": {
+      "title": "Etapa",
+      "description": "Macro-etapa da obra (ex: Fundação, Estrutura, Alvenaria)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "obraId": { "type": "string", "maxLength": 128 },
+        "ordem": { "type": "number" },
+        "nome": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["planejada", "pronta", "em_andamento", "concluida", "bloqueada"] },
+        "dataInicio": { "type": "string", "maxLength": 20 },
+        "dataPrevisaoFim": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "obraId", "ordem", "nome", "status"]
+    },
+    "Atividade": {
+      "title": "Atividade",
+      "description": "Atividade operacional subordinada a uma etapa de obra",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "obraId": { "type": "string", "maxLength": 128 },
+        "etapaId": { "type": "string", "maxLength": 128 },
+        "ordem": { "type": "number" },
+        "nome": { "type": "string", "maxLength": 150 },
+        "descricao": { "type": "string", "maxLength": 600 },
+        "status": { "type": "string", "enum": ["planejada", "preparando", "liberada", "em_execucao", "pausada", "concluida", "bloqueada"] },
+        "dependencias": { "type": "array" },
+        "criteriosProntidao": { "type": "array" },
+        "prontidaoAtendida": { "type": "boolean" },
+        "localizacao": { "type": "string", "maxLength": 100 },
+        "encarregadoId": { "type": "string", "maxLength": 128 },
+        "encarregadoNome": { "type": "string", "maxLength": 100 },
+        "dataInicioPrevista": { "type": "string", "maxLength": 20 },
+        "dataFimPrevista": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "obraId", "etapaId", "nome", "status", "prontidaoAtendida"]
+    },
+    "Execucao": {
+      "title": "Execucao",
+      "description": "Registro de execução e apontamento de campo",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "obraId": { "type": "string", "maxLength": 128 },
+        "etapaId": { "type": "string", "maxLength": 128 },
+        "atividadeId": { "type": "string", "maxLength": 128 },
+        "tipo": { "type": "string", "enum": ["inicio", "avanco", "pausa", "retomada", "finalizacao"] },
+        "percentualAvanco": { "type": "number" },
+        "observacao": { "type": "string", "maxLength": 1000 },
+        "clima": { "type": "string", "maxLength": 30 },
+        "efetivoPresente": { "type": "number" },
+        "registradoPorUid": { "type": "string", "maxLength": 128 },
+        "registradoPorNome": { "type": "string", "maxLength": 100 },
+        "offlineSync": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "obraId", "atividadeId", "tipo", "registradoPorUid"]
+    },
+    "Ocorrencia": {
+      "title": "Ocorrencia",
+      "description": "Desvio, não conformidade ou impeditivo na obra",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "obraId": { "type": "string", "maxLength": 128 },
+        "etapaId": { "type": "string", "maxLength": 128 },
+        "atividadeId": { "type": "string", "maxLength": 128 },
+        "codigo": { "type": "string", "maxLength": 30 },
+        "titulo": { "type": "string", "maxLength": 150 },
+        "descricao": { "type": "string", "maxLength": 800 },
+        "tipo": { "type": "string", "enum": ["seguranca", "qualidade", "material", "projeto", "clima", "maquinario", "interferencia"] },
+        "gravidade": { "type": "string", "enum": ["baixa", "media", "alta", "critica"] },
+        "status": { "type": "string", "enum": ["aberta", "em_analise", "acao_em_andamento", "resolvida", "encerrada"] },
+        "acoesNecessarias": { "type": "array" },
+        "resolucao": { "type": "string", "maxLength": 800 },
+        "autorizadoPor": { "type": "string", "maxLength": 100 },
+        "autorizadoEm": { "type": "string", "maxLength": 30 },
+        "registradoPorUid": { "type": "string", "maxLength": 128 },
+        "registradoPorNome": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "obraId", "codigo", "titulo", "gravidade", "status", "registradoPorUid"]
+    },
+    "Pendencia": {
+      "title": "Pendencia",
+      "description": "Pendência técnica, documental ou operacional da obra",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "obraId": { "type": "string", "maxLength": 128 },
+        "atividadeId": { "type": "string", "maxLength": 128 },
+        "titulo": { "type": "string", "maxLength": 150 },
+        "descricao": { "type": "string", "maxLength": 600 },
+        "categoria": { "type": "string", "enum": ["documental", "tecnica", "insumo", "fiscalizacao", "vistoria"] },
+        "obrigatoria": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["aberta", "em_tratamento", "concluida"] },
+        "responsavelNome": { "type": "string", "maxLength": 100 },
+        "prazo": { "type": "string", "maxLength": 20 },
+        "concluidaPor": { "type": "string", "maxLength": 100 },
+        "concluidaEm": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "obraId", "titulo", "categoria", "obrigatoria", "status"]
+    },
+    "Recurso": {
+      "title": "Recurso",
+      "description": "Equipamentos, equipes e materiais críticos de obra",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "obraId": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 100 },
+        "tipo": { "type": "string", "enum": ["equipamento", "equipe", "material_critico"] },
+        "quantidade": { "type": "number" },
+        "unidade": { "type": "string", "maxLength": 20 },
+        "disponibilidade": { "type": "string", "enum": ["disponivel", "em_uso", "manutencao", "indisponivel"] },
+        "alocadoEmAtividadeId": { "type": "string", "maxLength": 128 },
+        "observacao": { "type": "string", "maxLength": 400 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "obraId", "nome", "tipo", "disponibilidade"]
+    },
+    "Auditoria": {
+      "title": "Auditoria",
+      "description": "Log imutável de transições de status e decisões operacionais",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "entidade": { "type": "string", "maxLength": 50 },
+        "entidadeId": { "type": "string", "maxLength": 128 },
+        "acao": { "type": "string", "maxLength": 100 },
+        "de": { "type": "string", "maxLength": 100 },
+        "para": { "type": "string", "maxLength": 100 },
+        "usuarioUid": { "type": "string", "maxLength": 128 },
+        "usuarioNome": { "type": "string", "maxLength": 100 },
+        "detalhes": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "entidade", "entidadeId", "acao", "usuarioUid", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Perfis dos membros da construtora"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Administradores autorizados do sistema"
+    },
+    "/obras/{obraId}": {
+      "schema": "Obra",
+      "description": "Obras e empreendimentos da construtora"
+    },
+    "/etapas/{etapaId}": {
+      "schema": "Etapa",
+      "description": "Etapas construtivas das obras"
+    },
+    "/atividades/{atividadeId}": {
+      "schema": "Atividade",
+      "description": "Atividades e frentes de trabalho das etapas"
+    },
+    "/execucoes/{execucaoId}": {
+      "schema": "Execucao",
+      "description": "Registros de execução e apontamentos diários de campo"
+    },
+    "/ocorrencias/{ocorrenciaId}": {
+      "schema": "Ocorrencia",
+      "description": "Ocorrências, não-conformidades e impeditivos"
+    },
+    "/pendencias/{pendenciaId}": {
+      "schema": "Pendencia",
+      "description": "Pendências obrigatórias e técnicas de obra"
+    },
+    "/recursos/{recursoId}": {
+      "schema": "Recurso",
+      "description": "Recursos operacionais alocados às obras"
+    },
+    "/auditoria/{auditoriaId}": {
+      "schema": "Auditoria",
+      "description": "Trilha de auditoria das transições de status e regras críticas"
+    }
+  }
+}
